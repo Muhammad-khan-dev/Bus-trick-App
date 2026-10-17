@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver App - Bus Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #333; color: white; padding: 50px 20px; }
+        .card { background: #444; padding: 30px; border-radius: 10px; max-width: 400px; margin: auto; }
+        button { font-size: 20px; padding: 15px 30px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #startBtn { background: #28a745; color: white; }
+        #stopBtn { background: #dc3545; color: white; display: none; }
+        #status { margin-top: 20px; font-size: 18px; color: #ffc107; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>🚌 Authorized Tracker Panel</h2>
+        <p>Location share karne ke liye Start dabayein:</p>
+        
+        <button id="startBtn" onclick="startTracking()">Start Tracking</button>
+        <button id="stopBtn" onclick="stopTracking()">Stop Tracking</button>
+        
+        <div id="status">Status: Offline 🔴</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let watchId;
+
+        // Yahan aap apna secret PIN rakh sakte hain
+        const SECRET_PIN = "0909"; 
+
+        function startTracking() {
+            // PIN check karne ka logic
+            const userPin = prompt("Tracking start karne ke liye 4-digit PIN enter karein:");
+            
+            if (userPin !== SECRET_PIN) {
+                alert("❌ Galat PIN! Aapko location share karne ki ijazat nahi hai.");
+                return; // Code yahin ruk jayega aur tracking on nahi hogi
+            }
+
+            if ("geolocation" in navigator) {
+                document.getElementById('status').innerHTML = "Status: GPS Connect ho raha hai... 🟡";
+                
+                watchId = navigator.geolocation.watchPosition((position) => {
+                    const location = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    socket.emit('updateLocation', location);
+                    document.getElementById('status').innerHTML = `Status: Live 🟢<br>Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`;
+                }, 
+                (error) => {
+                    alert("GPS Error: " + error.message);
+                }, 
+                { enableHighAccuracy: true, maximumAge: 0 });
+
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'inline-block';
+            } else {
+                alert("Aapka browser GPS support nahi karta.");
+            }
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                socket.emit('driverOffline');
+                document.getElementById('status').innerHTML = "Status: Offline 🔴";
+                document.getElementById('startBtn').style.display = 'inline-block';
+                document.getElementById('stopBtn').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

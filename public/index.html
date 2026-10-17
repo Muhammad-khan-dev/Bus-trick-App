@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UET Main - Jalozai Bus Tracker</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f9; }
+        header { background: #003366; color: white; text-align: center; padding: 15px; }
+        #search-container { padding: 15px; text-align: center; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        select, button { padding: 10px; font-size: 16px; margin: 5px; }
+        #status-card { margin: 10px auto; max-width: 500px; padding: 15px; background: #e8f4f8; border-radius: 8px; text-align: center; font-weight: bold; font-size: 18px; }
+        #map { height: 450px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>🚌 UET Main Campus ↔ Jalozai Live Bus Tracking</h2>
+    </header>
+
+    <div id="search-container">
+        <label for="stopSelect"><strong>Apna Stop Search/Select Karein:</strong></label>
+        <select id="stopSelect">
+            <option value="">-- Stop Select Karein --</option>
+        </select>
+        <button onclick="checkStop()">Check Karein</button>
+    </div>
+
+    <div id="status-card">Apne stop ki information dekhne ke liye upar select karein.</div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <script>
+        const socket = io();
+
+        const map = L.map('map').setView([34.0000, 71.6500], 11);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let busMarker = L.marker([33.9983, 71.4853]).addTo(map).bindPopup("<b>UET Bus</b>").openPopup();
+
+        socket.on('stopsList', (stops) => {
+            const select = document.getElementById('stopSelect');
+            select.innerHTML = '<option value="">-- Stop Select Karein --</option>';
+            stops.forEach(stop => {
+                const option = document.createElement('option');
+                option.value = stop.id;
+                option.textContent = stop.name;
+                select.appendChild(option);
+
+                L.circleMarker([stop.lat, stop.lng], { color: 'red', radius: 6 })
+                    .addTo(map)
+                    .bindPopup(`Stop: ${stop.name}`);
+            });
+        });
+
+        socket.on('busLocationUpdate', (location) => {
+            busMarker.setLatLng([location.lat, location.lng]);
+        });
+
+        function checkStop() {
+            const selectedStopId = document.getElementById('stopSelect').value;
+            if(!selectedStopId) {
+                alert("Please ek stop select karein!");
+                return;
+            }
+            socket.emit('checkStopStatus', selectedStopId);
+        }
+
+        socket.on('stopStatusResult', (data) => {
+            document.getElementById('status-card').innerHTML = data.message;
+            map.setView([data.stop.lat, data.stop.lng], 13);
+        });
+    </script>
+</body>
+</html>
